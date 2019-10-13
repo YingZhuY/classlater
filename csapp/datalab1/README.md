@@ -4,6 +4,6 @@
 
 JSLinux上传输文件很方便，make也很方便，甚至不用提前装 GCC，哈哈哈，like this
 
-![](./JSLinux.png)
+![](https://github.com/Yudreamy/classlater/blob/master/csapp/datalab1/JSLinux.PNG)
 
 Learn to enjoy coding ~
