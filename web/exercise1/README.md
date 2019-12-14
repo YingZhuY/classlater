@@ -1,8 +1,8 @@
 # HTTPS
 
-环境：VMware-workstation-full-15.5.1，ubuntu-18.04.2-desktop-amd64，kali-linux-2019-4-vmware-amd64，Apache/2.4.29，OpenSSL1.1.1
+环境：VMware-workstation-full-15.5.1，ubuntu-18.04.2-desktop-amd64，kali-linux-2019-4-vmware-amd64，Apache/2.4.29，OpenSSL1.1.1，MySQL5.7.28，PHP7.2.24
 
-> 注意：安装 Kali 期间可以给用户设置一个密码，但如果用的是 live、i386、amd64、VMware 或 ARM 镜像是，默认账户 root，默认密码 root。
+> 注意：安装 Kali 期间可以给用户设置一个密码，但如果用的是 live、i386、amd64、VMware 或 ARM 镜像是，默认账户 root，默认密码 toor。
 
 ## 安装
 Ubuntu 上安装 Apache2
@@ -137,7 +137,7 @@ To activate the new configuration, you need to run:
   systemctl restart apache2
 @ubuntu:/etc/apache2/sites-available$ sudo systemctl restart apache2
 Enter passphrase for SSL/TLS keys for 127.0.1.1:443 (RSA): *****            # 输入服务器 PEM 密码短语
-# 每次启动和重新启动时都需要输入，出于安全原因，server.key 文件中的 RSA 私钥以加密格式存储；需要密码来解密，以便读取和解析。
+# 每次启动或重启时都需要输入，出于安全原因，server.key 文件中的 RSA 私钥以加密格式存储；需要密码来解密，以便读取和解析。
 ```
 
 ### 结果
@@ -220,7 +220,8 @@ Command 'php' not found, but can be installed with:
 
 sudo apt install php7.2-cli
 sudo apt install hhvm
-@ubuntu:~$ sudo apt install php7.2 php7.2-cli php7.2-common php7.2-gd php7.2-mysql libapache2-mod-php7.2            # 安装 php 相关
+# 安装 php 相关
+@ubuntu:~$ sudo apt install php7.2 php7.2-cli php7.2-common php7.2-gd php7.2-mysql libapache2-mod-php7.2
 Reading package lists... Done
 Building dependency tree       
 Reading state information... Done
