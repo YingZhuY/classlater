@@ -16,9 +16,9 @@
 
 有了上次 lab1 基础操作的熟悉，这个就比较简单了，主要是注意时钟设置。
 
-![](https://github.com/Yudreamy/classlater/blob/master/SystemModeling/lab1/picture/process.PNG)
+![](https://github.com/Yudreamy/classlater/blob/master/SystemModeling/lab2/picture/process.PNG)
 
-![](https://github.com/Yudreamy/classlater/blob/master/SystemModeling/lab1/picture/result.PNG)
+![](https://github.com/Yudreamy/classlater/blob/master/SystemModeling/lab2/picture/result.PNG)
 
 
 # Reference：
