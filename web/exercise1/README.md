@@ -104,8 +104,8 @@ cacert.pem         index.txt.attr      serial          tempkey.pem
 caconfig.cnf       index.txt.attr.old  serial.old
 exampleserver.cnf  index.txt.old       server_crt.pem
 index.txt          private             signedcerts
-vic@ubuntu:~/myCA$ cd private
-vic@ubuntu:~/myCA/private$ ls
+@ubuntu:~/myCA$ cd private
+@ubuntu:~/myCA/private$ ls
 cakey.pem
 ```
 
